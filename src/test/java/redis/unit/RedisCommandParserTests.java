@@ -1,7 +1,8 @@
-package redis;
+package redis.unit;
 
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
+import redis.RedisCommandParser;
 
 /**
  * Created by bchen on 9/23/17.
