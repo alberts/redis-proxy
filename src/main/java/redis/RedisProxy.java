@@ -1,48 +1,68 @@
 package redis;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * Created by bchen on 9/23/17.
+ * Created by bchen on 9/24/17.
  */
-public final class RedisProxy {
+public class RedisProxy {
 
-    private static int PORT = 6379;
-    private String hostname;
+    public static int REDIS_PORT = 6379;
+    public static int PROXY_PORT = 7379;
 
-    public RedisProxy(String hostname) {
-        this.hostname = hostname;
+    private RespClient redisClient;
+    private LRULoadingCache cache;
+    private ExecutorService executorService;
+
+    public RedisProxy(String redisHost, int capacity, long cacheExpiryInMs) {
+        redisClient = new RespClient(redisHost, REDIS_PORT);
+        cache = new LRULoadingCache(capacity, cacheExpiryInMs, (command) -> redisClient.sendRequest(command));
+        executorService = Executors.newFixedThreadPool(5);
     }
 
-    public String execute(String command) {
-        try {
-            Socket socket = new Socket(hostname, PORT);
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    public void handleRequest(Socket connectionSocket) {
+        executorService.submit(() -> {
+            try {
+                BufferedReader in = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
+                DataOutputStream out = new DataOutputStream(connectionSocket.getOutputStream());
 
-            out.print(command);
-            out.flush();
+                String command = RedisParser.readRespMessage(in);;
+                String key = RedisParser.parseGet(command);
+                String response = cache.get(command, key);
+                out.writeBytes(response);
 
-            StringBuilder sb = new StringBuilder();
-            char[] cbuf = new char[1024];
-            int k;
-            while ((k = in.read(cbuf, 0, 1024)) != -1) {
-                sb.append(cbuf, 0, k);
-                if (k < 1024) {
-                    break;
-                }
+                in.close();
+                out.close();
+                connectionSocket.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
+        });
+    }
 
-            out.close();
-            in.close();
-            socket.close();
-            return sb.toString();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    public static void main(String[] args) {
+        if (args.length != 3) {
+            System.out.println("Required arguments: [redisHost] [capacity] [cacheExpiryInMs]");
+            return;
+        }
+        String redisHost = args[0];
+        int capacity = Integer.parseInt(args[1]);
+        long cacheExpiryInMs = Long.parseLong(args[2]);
+        RedisProxy proxy = new RedisProxy(redisHost, capacity, cacheExpiryInMs);
+        try {
+            ServerSocket socket = new ServerSocket(PROXY_PORT);
+            System.out.println("Ready to accept connections");
+            while (true) {
+                Socket connectionSocket = socket.accept();
+                System.out.println("Connection from " + connectionSocket.getInetAddress() + ":" + connectionSocket.getPort() + " accepted");
+                proxy.handleRequest(connectionSocket);
+            }
+        } catch (IOException | RuntimeException e) {
+            e.printStackTrace();
         }
     }
 
