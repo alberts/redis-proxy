@@ -9,3 +9,11 @@ dependencies {
     testCompile "junit:junit:4.11"
     testCompile "org.assertj:assertj-core:3.8.0"
 }
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'Redis Proxy',
+                'Implementation-Version': 0.1,
+                'Main-Class': 'redis.RedisProxy'
+    }
+}

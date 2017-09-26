@@ -1,0 +1,63 @@
+Redis Proxy
+-----------
+
+Architecture Overview
+---------------------
+This is a Redis proxy that supports multiple concurrent requests for fetching existing key-value
+pairs in the backing Redis store. It is currently capable of handling one single type of Redis
+operation, GET. As specified in the requirements, it cached the values of GET operations in a local,
+in-memory LRU cache with a global expiry configured at startup time.
+
+This proxy listens on port 6379, and uses 5 worker threads to processing incoming requests concurrently.
+
+
+Implementation Details
+----------------------
+The implementation of this proxy does not use any third-party libraries offered outside of the Java JDK.
+Several common libraries could greatly benefit the development of this proxy, such as Guava or Caffeine
+for caching, and Jedis for Redis protocol, but for the purpose of this exercise they are not used.
+
+There are 4 main classes:
+
+RedisParser: implementataion of a subset of RESP. It is capable to read the incoming RESP message from
+an input stream, and parse GET commands.
+
+RedisClient: a simple, thread-safe client for talking to RESP services over TCP.
+
+LRULoadingCache: an in-memory LRU cache. Once the cache fills up and a new value needs to be added, the
+least recently used key will be evicted from cache. It has a background thread that scans all cached
+values every second, and evicts all keys that have expired.
+
+RedisProxy: The main class that integrates all pieces together, and creates a web service that listens
+on port 6379.
+
+
+Instructions
+------------
+To run this proxy (requires Java 8):
+    ./gradlew jar
+    java -jar ./build/libs/redis-proxy.jar [redisHost] [capacity] [expiryInMs]
+
+To run end-to-end tests:
+    make test
+
+
+Requirements Omitted
+--------------------
+All basic and bonus requirements are implemented. More Redis read commands could be implemented and supported
+by this proxy, but due to the time limit I haven't been able to add them.
+
+
+Time Taken
+----------
+I took a total about 6 hours to finish this exercise, and the detailed breakdown is:
+
+Read instructions, think about high-level architecture: 30 mins
+Initial development environment setup, such as Gradle and Docker: 30 mins
+Implement subset of RESP + test: 1 hour
+Implement Redis client + test: 1 hour
+Implement LRU cache + test: 1.5 hours
+End-to-end test, and debug: 1.5 hours
+
+Main reason that it took longer than expected is because while I'm familiar with the concepts, I haven't done
+low-level system programming for a while (socket programming, network protocol parser, cache implementation).
