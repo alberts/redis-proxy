@@ -1,10 +1,5 @@
-test: docker runProxy
-	./gradlew test --rerun-tasks
-	jps | grep "redis-proxy.jar" | awk '{print $$1}' | xargs kill
+test: docker
+	docker exec -it redisproxy_proxy_1 ./gradlew test --rerun-tasks 
 
 docker:
 	docker-compose up -d
-
-runProxy:
-	./gradlew jar
-	java -jar ./build/libs/redis-proxy.jar localhost 5 5000 &

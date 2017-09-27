@@ -8,7 +8,7 @@ pairs in the backing Redis store. It is currently capable of handling one single
 operation, GET. As specified in the requirements, it cached the values of GET operations in a local,
 in-memory LRU cache with a global expiry configured at startup time.
 
-This proxy listens on port 6379, and uses 5 worker threads to processing incoming requests concurrently.
+This proxy listens on port 7379, and uses 5 worker threads to processing incoming requests concurrently.
 
 
 Implementation Details
